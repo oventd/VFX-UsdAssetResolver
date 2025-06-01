@@ -14,6 +14,7 @@
 #include "pxr/usd/ar/filesystemAsset.h"
 #include "pxr/usd/ar/filesystemWritableAsset.h"
 #include "pxr/usd/ar/notice.h"
+#include <pxr/usd/ar/defaultResolver.h>
 
 #include <fstream>
 #include <iostream>
@@ -22,6 +23,10 @@
 #include <regex>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+TF_DEBUG_CODES(
+    AR_RESOLVER_INIT
+)
 
 AR_DEFINE_RESOLVER(FileResolver, ArResolver);
 
@@ -128,56 +133,39 @@ FileResolver::_CreateIdentifierForNewAsset(
 }
 
 ArResolvedPath
-FileResolver::_Resolve(
-    const std::string& assetPath) const
+FileResolver::_Resolve(const std::string& assetPath) const
 {
     if (assetPath.empty()) {
         return ArResolvedPath();
     }
 
-    if (this->_IsContextDependentPath(assetPath)) {
-        const FileResolverContext* contexts[2] = {this->_GetCurrentContextPtr(), &_fallbackContext};
-        for (const FileResolverContext* ctx : contexts) {
-            if (ctx) {
-                auto &mappingPairs = ctx->GetMappingPairs();
-                std::string mappedPath = assetPath;
-                if (!mappingPairs.empty()){
-                    if (!ctx->GetMappingRegexExpressionStr().empty())
-                    {
-                        mappedPath = std::regex_replace(mappedPath,
-                                                        ctx->GetMappingRegexExpression(),
-                                                        ctx->GetMappingRegexFormat());
-                        TF_DEBUG(FILERESOLVER_RESOLVER_CONTEXT).Msg("Resolver::_CreateDefaultContextForAsset('%s')"
-                                                                    " - Mapped to '%s' via regex expression '%s' with formatting '%s'\n", 
-                                                                    assetPath.c_str(),
-                                                                    mappedPath.c_str(),
-                                                                    ctx->GetMappingRegexExpressionStr().c_str(),
-                                                                    ctx->GetMappingRegexFormat().c_str());
-                    }
-                }
-                auto map_find = mappingPairs.find(mappedPath);
-                if(map_find != mappingPairs.end()){
-                    mappedPath = map_find->second;
-                }
+    if (TfStringStartsWith(assetPath, "rsrc://")) {
+        const char* show = std::getenv("SHOW_NAME");
+        const char* shot = std::getenv("SHOT_NAME");
 
-                if (this->exposeAbsolutePathIdentifierState) {
-                    if (!_IsSearchPath(mappedPath)){
-                        return _ResolveAnchored(std::string(), mappedPath);;
-                    }
-                }
-
-                for (const auto& searchPath : ctx->GetSearchPaths()) {
-                    ArResolvedPath resolvedPath = _ResolveAnchored(searchPath, mappedPath);
-                    if (resolvedPath) {
-                        return resolvedPath;
-                    }
-                }
-                // Only try the first valid context.
-                break;
-            }
+        if (!show || !shot) {
+            TF_WARN("SHOW_NAME or SHOT_NAME is not set");
+            return ArResolvedPath();
         }
+
+        std::string relativePath = assetPath.substr(strlen("rsrc://"));
+        if (!relativePath.empty() && relativePath[0] == '/') {
+            relativePath = relativePath.substr(1);
+        }
+
+        std::string resolvedPath = TfStringPrintf(
+            "D:/inferno/%s/%s/%s",
+            show, shot, relativePath.c_str()
+        );
+
+        TF_DEBUG(AR_RESOLVER_INIT).Msg(">>> FileResolver: %s → %s\n",
+                                       assetPath.c_str(), resolvedPath.c_str());
+
+        return ArResolvedPath(resolvedPath);
     }
-    return _ResolveAnchored(std::string(), assetPath);
+
+    pxr::ArDefaultResolver defaultResolver;
+    return defaultResolver.Resolve(assetPath);
 }
 
 ArResolvedPath
