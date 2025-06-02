@@ -138,8 +138,12 @@ FileResolver::_Resolve(const std::string& assetPath) const
     if (assetPath.empty()) {
         return ArResolvedPath();
     }
+    TF_DEBUG(AR_RESOLVER_INIT).Msg(">>> Resolve called for: %s\n", assetPath.c_str());
+    if (TfStringStartsWith(assetPath, "rsrc:/")) {
+        std::cout << ">>> FileResolver Resolve calleddd" << std::endl;
+        printf(">>> Resolve called fordd: %s\n", assetPath.c_str());
+        TF_DEBUG(AR_RESOLVER_INIT).Msg(">>> Resolve called fordd: %s\n", assetPath.c_str());
 
-    if (TfStringStartsWith(assetPath, "rsrc://")) {
         const char* show = std::getenv("SHOW_NAME");
         const char* shot = std::getenv("SHOT_NAME");
 
@@ -148,7 +152,7 @@ FileResolver::_Resolve(const std::string& assetPath) const
             return ArResolvedPath();
         }
 
-        std::string relativePath = assetPath.substr(strlen("rsrc://"));
+        std::string relativePath = assetPath.substr(strlen("rsrc:/"));
         if (!relativePath.empty() && relativePath[0] == '/') {
             relativePath = relativePath.substr(1);
         }
@@ -158,7 +162,7 @@ FileResolver::_Resolve(const std::string& assetPath) const
             show, shot, relativePath.c_str()
         );
 
-        TF_DEBUG(AR_RESOLVER_INIT).Msg(">>> FileResolver: %s → %s\n",
+        TF_DEBUG(AR_RESOLVER_INIT).Msg(">>> FileResolver: %s > %s\n",
                                        assetPath.c_str(), resolvedPath.c_str());
 
         return ArResolvedPath(resolvedPath);
